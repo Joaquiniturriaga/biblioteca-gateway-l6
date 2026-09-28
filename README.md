@@ -1,181 +1,103 @@
-# biblioteca-gateway
+# biblioteca-gateway-l6
 
-El API Gateway de la biblioteca, en el estado en que queda al terminar **L1**.
+El gateway del proyecto guía, **tal como queda al terminar L4**. Es el punto de partida de **L6**
+para quien no llegó a terminar L4: forkea esto, agrégale tus valores, y arrancas L6 desde el mismo
+lugar que el resto del curso.
 
-Esto es el punto de partida de los laboratorios que siguen. Si el PC de la sala se
-restauró, si dejaste tu carpeta en otro equipo o si nunca te quedó andando: haz un
-**fork** de este repositorio y sigue desde acá. No pierdes nada de L1 — L1 ya lo
-entregaste y esto no lo reemplaza; es la base sobre la que se construye L3.
+Si ya tienes tu propio `L1-gateway` con L4 completo, **no necesitas este repositorio**: sigue con el
+tuyo. Esto es solo para quien lo perdió o nunca le quedó andando.
 
-```
-biblioteca-gateway/
-├── servicios/              los dos microservicios de atrás
-│   ├── libros.mjs              → escucha en el 3001
-│   └── prestamos.mjs           → escucha en el 3002
-├── gateway/                el proyecto NestJS
-│   └── src/
-│       ├── main.ts             → escucha en el 8080, con CORS
-│       ├── app.module.ts       → declara los dos controllers
-│       ├── libros.controller.ts     → /v1/libros  → 3001
-│       └── prestamos.controller.ts  → /v1/prestamos → 3002
-├── herramientas/
-│   └── token.mjs           genera un JWT con la forma real, firmado por ti
-├── capturas/               acá van tus .pcapng de Wireshark
-├── docs/
-│   └── https-y-wireshark.md el paso 2.5 de L1: TLS en el 8443 y las capturas
-└── probar.mjs              levanta los tres y comprueba que todo responde
-```
+## Qué es cada pieza
 
-`servicios/` y `gateway/` están separados a propósito: son programas
-independientes, y `gateway/` tiene su propio `package.json`. Mezclarlos en una
-carpeta es la causa nº1 de errores raros de Node, porque busca su configuración
-hacia arriba en el árbol y puede tomar la del vecino.
-
-## Su mitad gemela
-
-El frontend Angular vive en **[biblioteca-web](https://github.com/Umbingelelo/biblioteca-web)**, y
-es otro repositorio a propósito: frontend y backend se despliegan por separado, se
-versionan por separado y muchas veces los escriben equipos distintos.
-
-**Para L3 necesitas los dos forkeados.** Este responde en el 8080; ese consume el 8080
-desde el 4200, que es el origen que el `enableCors` de `main.ts` permite.
-
-## Partir
-
-Necesitas **Node 22 o superior** (`node -v`). Lo de L0.
-
-```bash
-git clone https://github.com/<tu-usuario>/biblioteca-gateway.git
-cd biblioteca-gateway/gateway
-npm install
-```
-
-`npm install` solo hace falta dentro de `gateway/`. Los microservicios y las
-herramientas no tienen dependencias: son Node puro.
-
-## Levantarlo
-
-Son **tres procesos que se quedan corriendo**, así que necesitas tres terminales
-—más una cuarta para los `curl`—. No es desorden: es cómo se trabaja con
-microservicios. En VS Code, el botón **+** del panel de terminal abre otra.
-
-| Terminal | Comando | En qué carpeta |
+| Carpeta o archivo | Qué es | Puerto |
 |---|---|---|
-| 1 | `node servicios/libros.mjs` | la raíz |
-| 2 | `node servicios/prestamos.mjs` | la raíz |
-| 3 | `npm run start:dev` | `gateway/` |
-| 4 | los `curl` | cualquiera |
+| `gateway/` | El API Gateway en NestJS. Verifica el token contra el JWKS de Cognito (L3 tramo 7) y responde **401** sin uno válido | **8080** |
+| `servicios/libros.mjs` | Microservicio de libros. Sirve `datos/catalogo.json` | **3001** |
+| `servicios/prestamos.mjs` | Microservicio de préstamos, **dueño del dato**: `GET` lista, `POST` crea, `DELETE` marca `devuelto: true` (L4 tramo 11.2) | **3002** |
+| `sembrar.mts` + `datos/` | El seed de L4: arma el catálogo con Google Books y las sinopsis con un modelo de lenguaje (o `--respaldo`, sin conexión), y los dos JSON que produce |  |
 
-**Qué tienes que ver:** las dos líneas `microservicio de … escuchando en
-http://localhost:300…` y, en la tercera, `gateway escuchando en
-http://localhost:8080`. El cursor no vuelve en ninguna: los programas están
-vivos, esperando.
+Adentro de `gateway/src/`, tres controllers y el verificador:
 
-Es `start:dev` y no `start` a propósito: el `:dev` deja Nest vigilando los
-archivos y recompilando en cada guardado. Con `start` editarías el código y el
-servidor seguiría respondiendo lo de antes, que es el tipo de detalle que hace
-perder veinte minutos buscando un error que no existe.
+| Archivo | Ruta que atiende | Qué exige |
+|---|---|---|
+| `libros.controller.ts` | `GET/POST /v1/libros` | token válido + scope `biblioteca/libros.leer` (o `.escribir` en el `POST`) |
+| `prestamos.controller.ts` | `GET /v1/prestamos` | token válido + scope `biblioteca/libros.leer` + grupo `bibliotecarios` |
+| `panel.controller.ts` | `GET/POST/DELETE /v1/panel...` | token válido + scope `biblioteca/libros.leer`; reenvía al BFF con la cabecera `Authorization` |
+| `auth/verificador.ts` | — | `verificar()`, `tieneScope()`, `estaEnGrupo()`, contra el JWKS de tu user pool |
 
-## Probarlo
+## Cómo usarlo
 
-Desde la terminal 4. **En Windows usa `curl.exe`, con el `.exe`** — `curl` a
-secas es un alias de `Invoke-WebRequest`, que acepta otros parámetros y da
-errores confusos con `-H` y `-i`.
+Necesitas **Node 24.15.0 o superior** y **npm 11** (`node -v`, `npm -v`).
 
-```bash
-curl -i http://localhost:8080/v1/libros
-# → 401, «falta el header Authorization»
-
-curl -i -H "Authorization: Bearer holaquetal" http://localhost:8080/v1/libros
-# → 200 y los tres libros
-
-curl -i -H "Authorization: Bearer holaquetal" http://localhost:8080/v1/prestamos
-# → 200 y los tres préstamos
-```
-
-Y mira las terminales 1 y 2: apareció una línea en cada una. Eso es el gateway
-yendo a buscar la respuesta al microservicio. **El cliente nunca supo que existe
-el puerto 3001.**
-
-### Las dos pruebas automáticas
+**1 · Fork y clon**, parado en `$HOME/DSY1107` (si ya tienes una carpeta `L1-gateway` de antes,
+renómbrala primero: `L1-gateway-anterior`):
 
 ```bash
-node probar.mjs            # desde la raíz: levanta los tres y comprueba todo
-cd gateway && npm test     # las unitarias de los controllers
+cd $HOME/DSY1107
+git clone https://github.com/TU_USUARIO/biblioteca-gateway-l6.git L1-gateway
+cd L1-gateway/gateway
+npm install
+cd ..
 ```
 
-`probar.mjs` no necesita nada instalado aparte de las dependencias del gateway.
-Levanta los tres procesos, les habla por HTTP y los baja al terminar. Comprueba lo
-que las unitarias no pueden ver: que los controllers estén declarados en
-`app.module.ts` —sin eso la ruta da 404 y el archivo está perfecto—, que cada
-`fetch` apunte al puerto correcto, y que el gateway esté en el 8080.
-
-Ese del puerto es el error que vale la pena tener cazado: dejar el 3001 en el
-`fetch` de préstamos **no da ningún error**. Responde 200, con datos válidos, del
-dominio equivocado.
-
-## Lo que este gateway hace, y lo que todavía no
-
-Hace tres cosas, que son las tres responsabilidades de un gateway:
-
-- **Enruta.** El cliente pide al 8080 y el gateway va a buscar la respuesta al
-  3001 o al 3002. El `v1` de la ruta es versionado: el día que cambies el formato
-  de la respuesta, eso es `v2` y quien usaba `v1` sigue funcionando.
-- **Es la puerta.** Sin header `Authorization` responde **401**. Ojo con la
-  diferencia: 401 es «no sé quién eres», que es este caso; 403 sería «sé quién
-  eres y no te alcanza».
-- **Aplica CORS.** Permite el origen `http://localhost:4200`, que es donde va a
-  vivir el frontend Angular.
-
-Y hay tres cosas que **no** hace, cada una con su laboratorio:
-
-| Lo que falta | Dónde se arregla |
-|---|---|
-| El token no se verifica: `Bearer holaquetal` pasa igual que un JWT | **L3**, donde el token lo emite Amazon Cognito de verdad, y el gateway empieza a comprobar `iss`, `token_use`, `client_id`, `exp` y los scopes |
-| La firma —la tercera parte del token— no se mira nunca | **L3 también**, contra el JWKS del emisor. Ojo con lo que no vas a encontrar en un access token de Cognito: no hay `aud`. Está explicado en el tramo 6.6 de L3 |
-| No hay autorización, solo autenticación | **L3**, con `scope` y `cognito:groups`: 401 es «no sé quién eres», 403 es «sé quién eres y no te alcanza» |
-| Los microservicios responden a quien los llame directo al 3001 | Con Docker y una red interna, donde el único que los alcanza es el gateway |
-
-Ese último pruébalo ahora, que es de un comando:
+**2 · Los dos `.env`.** Cada uno tiene su `.env.example` al lado — cópialo y rellénalo con **tu**
+ficha, no con la de este README:
 
 ```bash
-curl http://localhost:3001/libros
+cp .env.example .env
+cp gateway/.env.example gateway/.env
 ```
 
-Sin token, sin pasar por el gateway, y responde. **Un gateway no protege lo que
-se puede rodear.**
+- `.env` (la raíz): `GOOGLE_BOOKS_API_KEY` y `GROQ_API_KEY` de L4 tramos 2.3 y 2.4, y los dos `sub`
+  —no los correos— de tus usuarios de Cognito (L4 tramo 2.5).
+- `gateway/.env`: `COGNITO_ISSUER` y `COGNITO_CLIENT_ID` de tu ficha de L3 (tramo 7.1), y
+  `BFF_URL=http://localhost:3000` para cuando levantes tu `biblioteca-bff`.
 
-## Si algo te falló
-
-| Lo que te devuelve | Qué pasó |
-|---|---|
-| `{"message":"Cannot GET /v1/prestamos",…,"statusCode":404}` | El controller no está declarado en `app.module.ts`. En Nest, existir no basta |
-| Te devuelve **libros** en `/v1/prestamos`, con **200** | El `fetch` quedó apuntando al 3001. El más traicionero: no da error, responde lo equivocado |
-| `{"statusCode":500,"message":"Internal server error"}` | El microservicio de atrás no está corriendo. En la terminal 3 vas a ver `ECONNREFUSED` |
-| `EADDRINUSE: address already in use` | Quedó una copia anterior corriendo. Búscala en tus otras terminales y `Ctrl+C`. Si no la encuentras: `netstat -ano \| findstr :8080` y `taskkill /PID <n> /F` en Windows; `lsof -ti:8080 \| xargs kill -9` en macOS y Linux |
-| `curl` da errores raros con `-H` o `-i` | Estás en PowerShell sin el `.exe`. Usa `curl.exe` |
-
-Y antes de irte de la sala, **corta los procesos** con `Ctrl+C` en cada terminal.
-Si dejas los puertos ocupados, el próximo que se siente ahí va a pelear con
-`EADDRINUSE` sin entender por qué.
-
-## Sobre las versiones
-
-`gateway/package.json` fija las dependencias **exactas**, sin `^`, y el
-`package-lock.json` está versionado. No es pedantería: con treinta forks del mismo
-repositorio, un `^11.0.1` que un mes después resuelve a otra versión menor
-convierte «en mi computador funciona» en un problema que no se puede ayudar a
-distancia. El `package.json` fija lo que pedimos; el lock fija además todo lo que
-esas dependencias arrastran, que es la mitad del árbol.
-
-Por eso, si quieres el mismo árbol exacto que se probó:
+**3 · Vuelve a sembrar los datos con TUS `sub`.** `datos/catalogo.json` y `datos/prestamos.json`
+vienen en el repositorio, pero `datos/prestamos.json` trae `sub` de ejemplo, inventados para que el
+repositorio compile solo: no son los de tu Cognito, así que tu `/v1/prestamos` te va a devolver una
+lista que no es tuya hasta que la rehagas:
 
 ```bash
-cd gateway
-npm ci        # instala **desde el lock**, sin recalcular nada
+node --env-file=.env sembrar.mts --respaldo
 ```
 
-`npm install` también funciona y es lo que dice el resto de esta guía; la
-diferencia es que `npm ci` borra `node_modules` y no toca el lock, así que es el
-que conviene cuando algo «funcionaba ayer». Si quieres actualizar una dependencia,
-hazlo a propósito y en un commit que lo diga.
+Sin `--respaldo`, y con las dos API keys puestas, te arma el catálogo de verdad con Google Books y el
+modelo de lenguaje — es el mismo comando de L4 tramo 2.7.
+
+## Cómo se comprueba
+
+Es el mismo checklist del **"Antes de empezar" §1 de L6**: tres terminales, más una cuarta para los
+`curl`.
+
+| Terminal | Comando | Carpeta |
+|---|---|---|
+| 1 | `node servicios/libros.mjs` | `L1-gateway` |
+| 2 | `node servicios/prestamos.mjs` | `L1-gateway` |
+| 3 | `npm run start:dev` | `L1-gateway/gateway` |
+
+**Windows (PowerShell) — en Linux y macOS, quita el `.exe`:**
+
+```powershell
+curl.exe -i http://localhost:3001/libros
+curl.exe -i http://localhost:3002/prestamos
+curl.exe -i http://localhost:8080/v1/libros
+curl.exe -i -H "Authorization: Bearer holaquetal" http://localhost:8080/v1/libros
+```
+
+**Qué tienes que ver:** las dos primeras, **200** con tus libros y préstamos. La tercera, **401** —el
+gateway es la puerta—. La cuarta, **401** otra vez: un token de mentira no pasa el JWKS, que es
+exactamente lo que arregló L3.
+
+## Lo que este repositorio NO trae
+
+Nada de L6: sin `amqplib`, sin `servicios/package.json`, sin `.env` de un broker, y el BFF no reenvía
+todavía el `Authorization` a `prestamos.mjs` para publicar eventos. Eso es justamente lo que vas a
+construir hoy.
+
+## Si no tienes tu propio user pool de Cognito
+
+Te faltan los tramos 1 al 5 de **L3, "Identidad real con Cognito"** (el laboratorio del curso, no un
+archivo de este repositorio): ahí creas el user pool, el resource server, el app client, el grupo y
+el usuario. Si prefieres la línea de comandos en vez de la consola, están todos en el **Anexo CLI** al
+final de ese mismo laboratorio.
