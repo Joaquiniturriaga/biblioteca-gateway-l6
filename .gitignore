@@ -21,9 +21,13 @@ cert/
 capturas/*.pcapng
 capturas/*.pcap
 
-# Variables de entorno.
+# Variables de entorno, y las credenciales que agrega L4 (tramo 2.5).
 .env
 .env.local
+.env.*
+!.env.example
+ficha.txt
+cuerpo.json
 
 # Basura del sistema y del editor.
 .DS_Store
