@@ -25,13 +25,17 @@ Adentro de `gateway/src/`, tres controllers y el verificador:
 | `panel.controller.ts` | `GET/POST/DELETE /v1/panel...` | token válido + scope `biblioteca/libros.leer`; reenvía al BFF con la cabecera `Authorization` |
 | `auth/verificador.ts` | — | `verificar()`, `tieneScope()`, `estaEnGrupo()`, contra el JWKS de tu user pool |
 
+`probar.mjs` y `herramientas/token.mjs` vienen de L1 y ya no sirven: armaban un token de mentira que
+el gateway de hoy rechaza con 401, que es lo correcto. No los uses para comprobar nada.
+
 ## Cómo usarlo
 
 Necesitas **Node 24.15.0 o superior** y **npm 11** (`node -v`, `npm -v`).
 
-**1 · Fork y clon**, parado en `$HOME/DSY1107` (si ya tienes una carpeta `L1-gateway` de antes,
-renómbrala primero: `L1-gateway-anterior`):
-
+**1 · Fork y clon.** Abre [github.com/Umbingelelo/biblioteca-gateway-l6](https://github.com/Umbingelelo/biblioteca-gateway-l6)
+y aprieta **Fork**, arriba a la derecha. Después clona **tu** fork, parado en `$HOME/DSY1107`. Si ya
+tienes una carpeta `L1-gateway` de antes, renómbrala primero a `L1-gateway-anterior`. Los mismos
+comandos sirven en Windows (PowerShell), macOS y Linux, uno por línea:
 ```bash
 cd $HOME/DSY1107
 git clone https://github.com/TU_USUARIO/biblioteca-gateway-l6.git L1-gateway
@@ -40,16 +44,18 @@ npm install
 cd ..
 ```
 
-**2 · Los dos `.env`.** Cada uno tiene su `.env.example` al lado — cópialo y rellénalo con **tu**
-ficha, no con la de este README:
+**2 · Los dos `.env`.** Cada uno tiene su `.env.example` al lado: cópialo y rellénalo con **tu**
+ficha, no con la de este README. Parado en `L1-gateway`, los mismos comandos sirven en los tres
+sistemas:
 
 ```bash
 cp .env.example .env
 cp gateway/.env.example gateway/.env
 ```
 
-- `.env` (la raíz): `GOOGLE_BOOKS_API_KEY` y `GROQ_API_KEY` de L4 tramos 2.3 y 2.4, y los dos `sub`
-  —no los correos— de tus usuarios de Cognito (L4 tramo 2.5).
+- `.env` (la raíz): los dos `sub` —no los correos— de tus usuarios de Cognito (L4 tramo 2.5). Las
+  dos API keys de L4 tramos 2.3 y 2.4 solo hacen falta si vas a sembrar sin `--respaldo`; si no las
+  tienes, déjalas vacías.
 - `gateway/.env`: `COGNITO_ISSUER` y `COGNITO_CLIENT_ID` de tu ficha de L3 (tramo 7.1), y
   `BFF_URL=http://localhost:3000` para cuando levantes tu `biblioteca-bff`.
 
