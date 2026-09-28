@@ -1,3 +1,6 @@
+// Tramo 7.1 de L3: sin esto, Nest no lee el .env y COGNITO_ISSUER llega undefined.
+// Tiene que ir antes que cualquier otro import.
+import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 
