@@ -8,6 +8,9 @@ import {
 } from '@nestjs/common';
 import { verificar, tieneScope } from './auth/verificador';
 
+// Fuera de Compose el microservicio esta en localhost; dentro, el compose.yml pasa LIBROS_URL.
+const LIBROS_URL = process.env.LIBROS_URL ?? 'http://localhost:3001';
+
 /**
  * La ruta pública del catálogo.
  *
@@ -28,15 +31,17 @@ export class LibrosController {
     try {
       claims = await verificar(authorization);
     } catch (e) {
-      throw new UnauthorizedException((e as Error).message);   // → 401
+      throw new UnauthorizedException((e as Error).message); // → 401
     }
 
     // ── autorización: ¿y le alcanza para esto? ──
     if (!tieneScope(claims, 'biblioteca/libros.leer')) {
-      throw new ForbiddenException('te falta el permiso biblioteca/libros.leer');  // → 403
+      throw new ForbiddenException(
+        'te falta el permiso biblioteca/libros.leer',
+      ); // → 403
     }
 
-    const respuesta = await fetch('http://localhost:3001/libros');
+    const respuesta = await fetch(`${LIBROS_URL}/libros`);
     return respuesta.json();
   }
 
@@ -54,7 +59,9 @@ export class LibrosController {
     }
 
     if (!tieneScope(claims, 'biblioteca/libros.escribir')) {
-      throw new ForbiddenException('te falta el permiso biblioteca/libros.escribir');
+      throw new ForbiddenException(
+        'te falta el permiso biblioteca/libros.escribir',
+      );
     }
 
     return { ok: true };
